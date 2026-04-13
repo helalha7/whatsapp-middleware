@@ -1,0 +1,24 @@
+# Go build files
+bin/
+build/
+*.exe
+*.out
+
+# Go modules cache (optional)
+pkg/
+
+# Environment variables (VERY IMPORTANT)
+.env
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+
+# IDEs
+.vscode/
+.idea/
+
+# Temporary files
+tmp/

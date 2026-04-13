@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"whatsconnect/internal/webhook"
+	"whatsconnect/internal/infrastructure/webhook"
 )
 
 func main() {

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"whatsconnect/internal/webhook"
+	"whatsconnect/internal/infrastructure/webhook"
 )
 
 type SendMessageRequest struct {

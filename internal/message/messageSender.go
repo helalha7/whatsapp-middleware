@@ -1,17 +1,18 @@
-package whatsapp
+package message
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"whatsconnect/internal/webhook"
 )
 
 type SendMessageRequest struct {
-	MessagingProduct string `json:"messaging_product"`
-	To               string `json:"to"`
-	Type             string `json:"type"`
-	Text             Text   `json:"text"`
+	MessagingProduct string       `json:"messaging_product"`
+	To               string       `json:"to"`
+	Type             string       `json:"type"`
+	Text             webhook.Text `json:"text"`
 }
 
 func SendTextMessage(accessToken, phoneNumberID, to, message string) error {
@@ -21,7 +22,7 @@ func SendTextMessage(accessToken, phoneNumberID, to, message string) error {
 		MessagingProduct: "whatsapp",
 		To:               to,
 		Type:             "text",
-		Text: Text{
+		Text: webhook.Text{
 			Body: message,
 		},
 	}

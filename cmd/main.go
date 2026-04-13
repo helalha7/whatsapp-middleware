@@ -3,15 +3,14 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"whatsconnect/internal/whatsapp"
+	"whatsconnect/internal/webhook"
 )
 
 func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /webhook", whatsapp.VerifyWebhook)
-	mux.HandleFunc("POST /webhook", whatsapp.HandleWebhook)
+	webhook.RegisterRoutes(mux, &webhook.Handler{})
 
 	fmt.Println("Server is running...")
 	http.ListenAndServe(":8080", mux)

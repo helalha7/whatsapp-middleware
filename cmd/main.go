@@ -1,17 +1,20 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
+	"log"
 	"whatsconnect/internal/infrastructure/webhook"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
 
-	mux := http.NewServeMux()
+	router := gin.Default()
 
-	webhook.RegisterRoutes(mux, &webhook.Handler{})
+	webhook.RegisterRoutes(router, &webhook.Handler{})
 
-	fmt.Println("Server is running...")
-	http.ListenAndServe(":8080", mux)
+	err := router.Run(":8080")
+	if err != nil {
+		log.Fatal(err)
+	}
 }

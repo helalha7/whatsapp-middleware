@@ -5,24 +5,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"whatsconnect/internal/infrastructure/webhook"
 )
 
 type SendMessageRequest struct {
-	MessagingProduct string       `json:"messaging_product"`
-	To               string       `json:"to"`
-	Type             string       `json:"type"`
-	Text             webhook.Text `json:"text"`
+	MessagingProduct string `json:"messaging_product"`
+	To               string `json:"to"`
+	Type             string `json:"type"`
+	Text             Text   `json:"text"`
+}
+
+type Text struct {
+	Body string `json:"body"`
 }
 
 func SendTextMessage(accessToken, phoneNumberID, to, message string) error {
+	fmt.Println(to, phoneNumberID)
 	url := fmt.Sprintf("https://graph.facebook.com/v25.0/%s/messages", phoneNumberID)
 
 	reqBody := SendMessageRequest{
 		MessagingProduct: "whatsapp",
 		To:               to,
 		Type:             "text",
-		Text: webhook.Text{
+		Text: Text{
 			Body: message,
 		},
 	}

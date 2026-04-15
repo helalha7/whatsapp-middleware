@@ -1,8 +1,10 @@
 package webhook
 
-import "net/http"
+import (
+	"github.com/gin-gonic/gin"
+)
 
-func RegisterRoutes(mux *http.ServeMux, h *Handler) {
-	mux.HandleFunc("GET /webhook", h.VerifyWebhook)
-	mux.HandleFunc("POST /webhook", h.HandleWebhook)
+func RegisterRoutes(router *gin.Engine, h *Handler) {
+	router.GET("/webhook", h.VerifyWebhook)
+	router.POST("/webhook", h.HandleWebhook)
 }

@@ -58,10 +58,40 @@ func (payload *WebhookPayload) getSenderName() string {
 	return payload.Entry[0].Changes[0].Value.Contacts[0].Profile.Name
 }
 
-func (payload *WebhookPayload) getSenderPhoneNumber() string {
+func (payload *WebhookPayload) GetSenderPhoneNumber() string {
+	return payload.Entry[0].Changes[0].Value.Messages[0].From
+}
+
+func (payload *WebhookPayload) GetReceiverPhoneNumber() string {
 	return payload.Entry[0].Changes[0].Value.Metadata.DisplayPhoneNumber
 }
 
+func (payload *WebhookPayload) GetReceiverPhoneNumberID() string {
+	return payload.Entry[0].Changes[0].Value.Metadata.PhoneNumberID
+}
+
+func (payload *WebhookPayload) IsMessageReceived() bool {
+	if len(payload.Entry) == 0 {
+		return false
+	}
+
+	if len(payload.Entry[0].Changes) == 0 {
+		return false
+	}
+
+	value := payload.Entry[0].Changes[0].Value
+
+	if len(value.Messages) == 0 {
+		return false
+	}
+
+	if value.Messages[0].Type != "text" {
+		return false
+	}
+
+	return true
+}
+
 func (payload *WebhookPayload) String() string {
-	return fmt.Sprintf("{\nFrom : {name : %v, phone number: %v},\nMessage : '%v'\n}", payload.getSenderName(), payload.getSenderPhoneNumber(), payload.getMessageText())
+	return fmt.Sprintf("{\nFrom : {name : %v, phone number: %v},\nMessage : '%v'\n}", payload.getSenderName(), payload.GetSenderPhoneNumber(), payload.getMessageText())
 }

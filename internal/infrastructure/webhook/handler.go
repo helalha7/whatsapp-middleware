@@ -10,7 +10,6 @@ import (
 // token is the verification token that must match the token
 // configured in the Meta WhatsApp webhook settings.
 const token = "Helal212"
-const accessToken = "EAALq29NMSvMBRPeGiZBQ7iZA3y3OyeqnPIfErWDI0eQf1UobLcWpoZCyFIRt2etU4u24bWCZBAFAR9MaCvZCIwcYkQ6GbNEeKFR1ORz642AtRXDHBtgmIWIn1ZBckDKx3GQoLAPijRWUVx5NhsRLVvAZAiANfT7sJMrZByfmRqJJeV7CFBlLVyEeZBA8jPg5QWHmmZAhMIxrnyZCk0o5P5HhTixILXIMA1ZCuLt3OPAhSWQSAvHicZAiiuD25iXU5ww44fgI2mLEL0HlRaHnafMnWL006A739"
 
 type Handler struct {
 }

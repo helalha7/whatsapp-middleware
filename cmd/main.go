@@ -1,20 +1,18 @@
 package main
 
 import (
-	"log"
-	"whatsconnect/internal/infrastructure/webhook"
+	"net/http"
 
-	"github.com/gin-gonic/gin"
+	"github.com/helalha7/whatsapp-middleware/infrastructure/listener"
 )
 
 func main() {
+	mux := http.NewServeMux()
 
-	router := gin.Default()
+	listener := listener.NewListener("helal212")
 
-	webhook.RegisterRoutes(router, &webhook.Handler{})
+	mux.HandleFunc("GET /webhooks", listener.HandleVerification)
+	mux.HandleFunc("POST /webhooks", listener.HandleNotification)
 
-	err := router.Run(":8080")
-	if err != nil {
-		log.Fatal(err)
-	}
+	http.ListenAndServe(":8080", mux)
 }

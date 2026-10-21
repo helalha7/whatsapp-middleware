@@ -1,55 +1,55 @@
 package listener
 
-type Payload struct {
+type payload struct {
 	Object string  `json:"object"`
-	Entry  []Entry `json:"entry"`
+	Entry  []entry `json:"entry"`
 }
 
-type Entry struct {
+type entry struct {
 	ID      string   `json:"id"`
-	Changes []Change `json:"changes"`
+	Changes []change `json:"changes"`
 }
 
-type Change struct {
-	Value Value  `json:"value"`
+type change struct {
+	Value value  `json:"value"`
 	Field string `json:"field"`
 }
 
-type Value struct {
+type value struct {
 	MessagingProduct string    `json:"messaging_product"`
-	Metadata         Metadata  `json:"metadata"`
-	Contacts         []Contact `json:"contacts"`
-	Messages         []Message `json:"messages"`
+	Metadata         metadata  `json:"metadata"`
+	Contacts         []contact `json:"contacts"`
+	Messages         []message `json:"messages"`
 }
 
-type Metadata struct {
+type metadata struct {
 	DisplayPhoneNumber string `json:"display_phone_number"`
 	PhoneNumberID      string `json:"phone_number_id"`
 }
 
-type Contact struct {
+type contact struct {
 	Profile struct {
 		Name string `json:"name"`
 	} `json:"profile"`
 	WAID string `json:"wa_id"`
 }
 
-type Message struct {
+type message struct {
 	From      string `json:"from"`
 	ID        string `json:"id"`
 	Timestamp string `json:"timestamp"`
 	Type      string `json:"type"`
 
-	Text        *TextMessage        `json:"text,omitempty"`
-	Interactive *InteractiveMessage `json:"interactive,omitempty"`
-	Image       *MediaMessage       `json:"image,omitempty"`
+	Text        *textMessage        `json:"text,omitempty"`
+	Interactive *interactiveMessage `json:"interactive,omitempty"`
+	Image       *mediaMessage       `json:"image,omitempty"`
 }
 
-type TextMessage struct {
+type textMessage struct {
 	Body string `json:"body"`
 }
 
-type InteractiveMessage struct {
+type interactiveMessage struct {
 	Type string `json:"type"`
 
 	ButtonReply *struct {
@@ -64,7 +64,7 @@ type InteractiveMessage struct {
 	} `json:"list_reply,omitempty"`
 }
 
-type MediaMessage struct {
+type mediaMessage struct {
 	ID       string `json:"id"`
 	MimeType string `json:"mime_type"`
 	SHA256   string `json:"sha256"`

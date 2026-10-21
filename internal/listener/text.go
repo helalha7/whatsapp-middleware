@@ -2,7 +2,7 @@ package listener
 
 import "time"
 
-type NormalizedTextMessage struct {
+type NormalizedMessage struct {
 	BusinessID    string
 	PhoneNumberID string
 	CustomerID    string

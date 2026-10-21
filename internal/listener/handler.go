@@ -11,22 +11,12 @@ import (
 	"strings"
 )
 
-type Listener struct {
+type Handler struct {
 	verifyToken string
 	appSecret   string
 }
 
-func New(
-	verifyToken string,
-	appSecret string,
-) *Listener {
-	return &Listener{
-		verifyToken: verifyToken,
-		appSecret:   appSecret,
-	}
-}
-
-func (l *Listener) HandleVerification(
+func (h *Handler) HandleVerification(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -34,7 +24,7 @@ func (l *Listener) HandleVerification(
 	token := r.URL.Query().Get("hub.verify_token")
 	challenge := r.URL.Query().Get("hub.challenge")
 
-	if mode != "subscribe" || token != l.verifyToken {
+	if mode != "subscribe" || token != h.verifyToken {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -44,7 +34,7 @@ func (l *Listener) HandleVerification(
 	w.Write([]byte(challenge))
 }
 
-func (Listener *Listener) HandleNotification(
+func (h *Handler) HandleNotification(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
@@ -58,7 +48,7 @@ func (Listener *Listener) HandleNotification(
 
 	if !verifySignature(
 		body,
-		[]byte(Listener.appSecret),
+		[]byte(h.appSecret),
 		r.Header.Get("X-Hub-Signature-256"),
 	) {
 		http.Error(w, "invalid signature", http.StatusUnauthorized)

@@ -1,4 +1,4 @@
-package helpers
+package httpx
 
 import (
 	"encoding/json"

@@ -12,8 +12,8 @@ import (
 )
 
 type Handler struct {
-	verifyToken string
-	appSecret   string
+	VerifyToken string
+	AppSecret   string
 }
 
 func (h *Handler) HandleVerification(
@@ -24,7 +24,7 @@ func (h *Handler) HandleVerification(
 	token := r.URL.Query().Get("hub.verify_token")
 	challenge := r.URL.Query().Get("hub.challenge")
 
-	if mode != "subscribe" || token != h.verifyToken {
+	if mode != "subscribe" || token != h.VerifyToken {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -48,7 +48,7 @@ func (h *Handler) HandleNotification(
 
 	if !verifySignature(
 		body,
-		[]byte(h.appSecret),
+		[]byte(h.AppSecret),
 		r.Header.Get("X-Hub-Signature-256"),
 	) {
 		http.Error(w, "invalid signature", http.StatusUnauthorized)
@@ -56,22 +56,20 @@ func (h *Handler) HandleNotification(
 	}
 
 	var payload payload
-
 	if err := json.Unmarshal(body, &payload); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	// Not every webhook contains a text message.
-	if len(payload.Entry) == 0 ||
-		len(payload.Entry[0].Changes) == 0 ||
-		len(payload.Entry[0].Changes[0].Value.Messages) == 0 {
-		w.WriteHeader(http.StatusOK)
+	events, err := normalizePayload(payload)
+	if err != nil {
+		http.Error(w, "failed to normalize payload", http.StatusBadRequest)
 		return
 	}
 
-	text := payload.Entry[0].Changes[0].Value.Messages[0].Text.Body
-	fmt.Println(text)
+	for _, event := range events {
+		fmt.Printf("%+v\n", event)
+	}
 
 	w.WriteHeader(http.StatusOK)
 }

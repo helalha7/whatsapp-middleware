@@ -1,0 +1,11 @@
+-- +goose Up
+CREATE TABLE tenants (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    waba_id VARCHAR(32) NOT NULL UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    access_token TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- +goose Down
+DROP TABLE tenants;

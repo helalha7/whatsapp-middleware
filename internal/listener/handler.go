@@ -8,10 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 
-	"github.com/helalha7/whatsapp-middleware/internal/sender"
+	"github.com/helalha7/whatsapp-middleware/internal/queue"
 )
 
 type handler struct {
@@ -86,21 +85,10 @@ func (h *handler) handleNotification(
 
 	for _, event := range events {
 		fmt.Printf("%+v\n", event)
+		queue.InboundMessagesQueue <- event
 	}
 
 	w.WriteHeader(http.StatusOK)
-
-	go func() {
-		if events != nil {
-			s := sender.New(http.DefaultClient)
-			s.SendTextMessage(
-				events[0].PhoneNumberID,
-				os.Getenv("access_token"),
-				events[0].From,
-				events[0].Text.Body,
-			)
-		}
-	}()
 }
 
 func verifySignature(

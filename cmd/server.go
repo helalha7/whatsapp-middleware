@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 func Serve(
 	handler http.Handler,
+	stopWorkers context.CancelFunc,
 ) error {
 	srv := http.Server{
 		Addr:              ":8080",
@@ -29,6 +31,9 @@ func Serve(
 
 		s := <-sig
 
+		time.Sleep(2 * time.Second)
+
+		stopWorkers()
 		time.Sleep(2 * time.Second)
 
 		fmt.Printf("gracefully shutting down %v\n", s)

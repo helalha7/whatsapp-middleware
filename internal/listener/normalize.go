@@ -7,7 +7,9 @@ import (
 	"github.com/helalha7/whatsapp-middleware/internal/event"
 )
 
-func normalizePayload(p payload) ([]event.InboundMessage, error) {
+func normalizePayload(
+	p payload,
+) ([]event.InboundMessage, error) {
 	var events []event.InboundMessage
 
 	for _, entry := range p.Entry {

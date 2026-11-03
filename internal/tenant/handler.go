@@ -27,7 +27,7 @@ func RegisterRoutes(
 		tenantsStore: tenantsStore,
 	}
 
-	mux.HandleFunc("/v1/tenants/{id}", h.Get)
+	mux.HandleFunc("GET /v1/tenants/{id}", h.Get)
 }
 
 func (h *handler) Get(
@@ -36,7 +36,7 @@ func (h *handler) Get(
 ) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || id < 1 {
-		//record not found response
+		httpx.ResourceNotFoundResponse(w, r)
 		return
 	}
 
@@ -47,9 +47,9 @@ func (h *handler) Get(
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			//send record not found response
+			httpx.ResourceNotFoundResponse(w, r)
 		default:
-			//internal server error response
+			httpx.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -61,6 +61,7 @@ func (h *handler) Get(
 		nil,
 	)
 	if err != nil {
-		//internal server error response
+		httpx.ServerErrorResponse(w, r, err)
+		return
 	}
 }

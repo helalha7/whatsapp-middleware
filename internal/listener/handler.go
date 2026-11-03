@@ -18,7 +18,7 @@ type handler struct {
 	appSecret   string
 }
 
-func Register(
+func RegisterRoutes(
 	mux *http.ServeMux,
 	verifyToken string,
 	appSecret string,

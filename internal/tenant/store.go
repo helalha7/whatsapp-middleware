@@ -23,13 +23,13 @@ func (s *Store) Get(ctx context.Context, id int) (*Tenant, error) {
 
 	var t Tenant
 	err := row.Scan(
-		t.ID,
-		t.CreatedAt,
-		t.Version,
-		t.Name,
-		t.WABAID,
-		t.PhoneNumberID,
-		t.DisplayPhoneNumber,
+		&t.ID,
+		&t.CreatedAt,
+		&t.Version,
+		&t.Name,
+		&t.WABAID,
+		&t.PhoneNumberID,
+		&t.DisplayPhoneNumber,
 	)
 	if err != nil {
 		switch {

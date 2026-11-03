@@ -30,9 +30,9 @@ func WriteJSON(
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	fmt.Fprint(w, string(js))
+	_, err = w.Write(js)
 
-	return nil
+	return err
 }
 
 func ReadJSON(

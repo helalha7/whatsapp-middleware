@@ -13,7 +13,6 @@ import (
 
 func Serve(
 	handler http.Handler,
-	stopWorkers context.CancelFunc,
 ) error {
 	srv := http.Server{
 		Addr:              ":8080",
@@ -26,21 +25,28 @@ func Serve(
 
 	sig := make(chan os.Signal, 1)
 
+	shutdown := make(chan struct{})
+
 	go func() {
 		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 		s := <-sig
 
-		time.Sleep(2 * time.Second)
+		ctx, stopServer := context.WithTimeout(context.Background(), 20*time.Second)
+		defer stopServer()
+		srv.Shutdown(ctx)
 
-		stopWorkers()
-		time.Sleep(2 * time.Second)
-
-		fmt.Printf("gracefully shutting down %v\n", s)
-		os.Exit(1)
+		fmt.Printf("gracefully shutting down, signal: %v\n", s)
+		shutdown <- struct{}{}
 	}()
 
 	log.Printf("starting server on port %s", srv.Addr)
 
-	return srv.ListenAndServe()
+	err := srv.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		return err
+	}
+
+	<-shutdown
+	return nil
 }

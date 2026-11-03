@@ -12,3 +12,8 @@ type Tenant struct {
 	DisplayPhoneNumber string    `json:"display_phone_number"`
 	AccessToken        string    `json:"-"`
 }
+
+func (t *Tenant) Validate() map[string]string {
+	//TO BE IMPLEMENTED
+	return nil
+}

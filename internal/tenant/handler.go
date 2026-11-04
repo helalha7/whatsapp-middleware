@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/helalha7/whatsapp-middleware/internal/data"
@@ -34,8 +33,8 @@ func (h *handler) Get(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil || id < 1 {
+	id, err := httpx.ReadIdParam(r)
+	if err != nil {
 		httpx.ResourceNotFoundResponse(w, r)
 		return
 	}

@@ -90,7 +90,9 @@ func main() {
 	}
 }
 
-func connectDB(dsn string) (*sql.DB, error) {
+func connectDB(
+	dsn string,
+) (*sql.DB, error) {
 	db, err := sql.Open(
 		"mysql",
 		dsn,

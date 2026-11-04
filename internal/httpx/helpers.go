@@ -6,10 +6,21 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
 type Envelope map[string]any
+
+func ReadIdParam(r *http.Request) (int, error) {
+	idPath := r.PathValue("id")
+	id, err := strconv.Atoi(idPath)
+	if err != nil || id < 1 {
+		return 0, err
+	}
+
+	return id, nil
+}
 
 func WriteJSON(
 	w http.ResponseWriter,

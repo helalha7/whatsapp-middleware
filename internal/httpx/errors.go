@@ -47,3 +47,19 @@ func ResourceNotFoundResponse(
 	message := "couldn't find the requested resource"
 	ErrorResponse(w, r, http.StatusNotFound, message)
 }
+
+func DuplicateRecordResponse(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	message := "a record with these details already exists"
+	ErrorResponse(w, r, http.StatusConflict, message)
+}
+
+func ValidationFailedResponse(
+	w http.ResponseWriter,
+	r *http.Request,
+	errors map[string]string,
+) {
+	ErrorResponse(w, r, http.StatusUnprocessableEntity, errors)
+}

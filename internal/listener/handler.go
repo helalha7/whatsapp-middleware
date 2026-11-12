@@ -1,31 +1,47 @@
 package listener
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
-	"github.com/helalha7/whatsapp-middleware/internal/queue"
+	"github.com/helalha7/whatsapp-middleware/internal/event"
+	"github.com/helalha7/whatsapp-middleware/internal/httpx"
 )
 
+type inboundMessageRegistry interface {
+	RegisterInboundMessage(ctx context.Context, wabaID string, messageID string) (bool, error)
+}
+
+type inboundPublisher interface {
+	Publish(ctx context.Context, message event.InboundMessage) error
+}
+
 type handler struct {
-	verifyToken string
-	appSecret   string
+	verifyToken      string
+	appSecret        string
+	messageRegistry  inboundMessageRegistry
+	inboundPublisher inboundPublisher
 }
 
 func RegisterRoutes(
 	mux *http.ServeMux,
 	verifyToken string,
 	appSecret string,
+	messageRegistry inboundMessageRegistry,
+	inboundPublisher inboundPublisher,
 ) {
 	h := &handler{
-		verifyToken: verifyToken,
-		appSecret:   appSecret,
+		verifyToken:      verifyToken,
+		appSecret:        appSecret,
+		messageRegistry:  messageRegistry,
+		inboundPublisher: inboundPublisher,
 	}
 
 	mux.HandleFunc("GET /v1/webhooks", h.handleVerification)
@@ -83,9 +99,28 @@ func (h *handler) handleNotification(
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
 	for _, event := range events {
-		fmt.Printf("%+v\n", event)
-		queue.InboundMessagesQueue <- event
+		isNew, err := h.messageRegistry.RegisterInboundMessage(
+			ctx,
+			event.WABAID,
+			event.ID,
+		)
+		if err != nil {
+			httpx.ServerErrorResponse(w, r, err)
+			return
+		}
+		if !isNew {
+			continue
+		}
+
+		err = h.inboundPublisher.Publish(ctx, event)
+		if err != nil {
+			httpx.ServerErrorResponse(w, r, err)
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)

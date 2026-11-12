@@ -2,16 +2,14 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 )
 
 func Serve(
+	ctx context.Context,
 	handler http.Handler,
 ) error {
 	srv := http.Server{
@@ -23,30 +21,24 @@ func Serve(
 		IdleTimeout:       60 * time.Second,
 	}
 
-	sig := make(chan os.Signal, 1)
-
-	shutdown := make(chan struct{})
+	shutdownComplete := make(chan error, 1)
 
 	go func() {
-		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+		<-ctx.Done()
 
-		s := <-sig
-
-		ctx, stopServer := context.WithTimeout(context.Background(), 20*time.Second)
+		shutdownCtx, stopServer := context.WithTimeout(context.Background(), 20*time.Second)
 		defer stopServer()
-		srv.Shutdown(ctx)
 
-		fmt.Printf("gracefully shutting down, signal: %v\n", s)
-		shutdown <- struct{}{}
+		log.Println("shutting down HTTP server")
+		shutdownComplete <- srv.Shutdown(shutdownCtx)
 	}()
 
 	log.Printf("starting server on port %s", srv.Addr)
 
 	err := srv.ListenAndServe()
-	if err != nil && err != http.ErrServerClosed {
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 
-	<-shutdown
-	return nil
+	return <-shutdownComplete
 }

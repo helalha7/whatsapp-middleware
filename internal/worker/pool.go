@@ -5,6 +5,7 @@ import (
 	"sync"
 )
 
+// helal
 type WorkerPool[T any] struct {
 	workers int
 	jobs    <-chan T

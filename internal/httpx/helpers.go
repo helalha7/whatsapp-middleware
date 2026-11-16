@@ -12,7 +12,9 @@ import (
 
 type Envelope map[string]any
 
-func ReadIdParam(r *http.Request) (int, error) {
+func ReadIdParam(
+	r *http.Request,
+) (int, error) {
 	idPath := r.PathValue("id")
 	id, err := strconv.Atoi(idPath)
 	if err != nil || id < 1 {

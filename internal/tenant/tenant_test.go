@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// tests
 func TestTenantValidate(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -14,9 +14,26 @@ func normalizePayload(
 
 	for _, entry := range p.Entry {
 		for _, change := range entry.Changes {
+			if change.Field != "messages" {
+				continue
+			}
+
 			value := change.Value
+			if value.MessagingProduct != "whatsapp" {
+				return nil, fmt.Errorf(
+					"unexpected messaging product %q",
+					value.MessagingProduct,
+				)
+			}
+			if len(value.Messages) > 0 && entry.ID == "" {
+				return nil, fmt.Errorf("missing WABA ID")
+			}
 
 			for _, msg := range value.Messages {
+				if msg.ID == "" {
+					return nil, fmt.Errorf("missing message ID")
+				}
+
 				e := event.InboundMessage{
 					ID:                 msg.ID,
 					WABAID:             entry.ID,

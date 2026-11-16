@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -17,6 +19,7 @@ import (
 
 type inboundMessageRegistry interface {
 	RegisterInboundMessage(ctx context.Context, wabaID string, messageID string) (bool, error)
+	ReleaseInboundMessage(ctx context.Context, wabaID string, messageID string) error
 }
 
 type inboundPublisher interface {
@@ -92,6 +95,10 @@ func (h *handler) handleNotification(
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
+	if err := validatePayload(payload); err != nil {
+		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
+		return
+	}
 
 	events, err := normalizePayload(payload)
 	if err != nil {
@@ -118,12 +125,34 @@ func (h *handler) handleNotification(
 
 		err = h.inboundPublisher.Publish(ctx, event)
 		if err != nil {
-			httpx.ServerErrorResponse(w, r, err)
+			releaseCtx, releaseCancel := context.WithTimeout(
+				context.WithoutCancel(r.Context()),
+				5*time.Second,
+			)
+			releaseErr := h.messageRegistry.ReleaseInboundMessage(
+				releaseCtx,
+				event.WABAID,
+				event.ID,
+			)
+			releaseCancel()
+
+			httpx.ServerErrorResponse(w, r, errors.Join(err, releaseErr))
 			return
 		}
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func validatePayload(p payload) error {
+	if p.Object != "whatsapp_business_account" {
+		return fmt.Errorf("unexpected webhook object %q", p.Object)
+	}
+	if len(p.Entry) == 0 {
+		return errors.New("webhook payload contains no entries")
+	}
+
+	return nil
 }
 
 func verifySignature(

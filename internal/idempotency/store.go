@@ -47,3 +47,24 @@ func (s *Store) RegisterInboundMessage(
 
 	return true, nil
 }
+
+// ReleaseInboundMessage removes a registration when a message could not be
+// handed to the queue, allowing Meta's next delivery attempt to retry it.
+func (s *Store) ReleaseInboundMessage(
+	ctx context.Context,
+	wabaID string,
+	messageID string,
+) error {
+	query := `
+		DELETE FROM received_inbound_messages
+		WHERE whatsapp_message_id = ?
+		AND tenant_id = (
+			SELECT id
+			FROM tenants
+			WHERE waba_id = ?
+		)
+	`
+
+	_, err := s.DB.ExecContext(ctx, query, messageID, wabaID)
+	return err
+}

@@ -85,3 +85,45 @@ func TestRegisterInboundMessage(t *testing.T) {
 		})
 	}
 }
+
+func TestReleaseInboundMessage(t *testing.T) {
+	databaseError := errors.New("database unavailable")
+	tests := []struct {
+		name      string
+		execError error
+	}{
+		{name: "releases message"},
+		{name: "returns database error", execError: databaseError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("create mock database: %v", err)
+			}
+			defer db.Close()
+
+			expectation := mock.ExpectExec("DELETE FROM received_inbound_messages").
+				WithArgs("wamid.message-id", "2161887421343402")
+			if tt.execError != nil {
+				expectation.WillReturnError(tt.execError)
+			} else {
+				expectation.WillReturnResult(sqlmock.NewResult(0, 1))
+			}
+
+			store := &Store{DB: db}
+			err = store.ReleaseInboundMessage(
+				context.Background(),
+				"2161887421343402",
+				"wamid.message-id",
+			)
+			if !errors.Is(err, tt.execError) {
+				t.Fatalf("expected error %v, got %v", tt.execError, err)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unmet database expectations: %v", err)
+			}
+		})
+	}
+}

@@ -5,11 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 )
 
+const defaultBaseURL = "https://graph.facebook.com/v26.0"
+
 type Sender struct {
-	client *http.Client
+	client  *http.Client
+	baseURL string
 }
 
 func New(
@@ -17,14 +22,16 @@ func New(
 ) *Sender {
 
 	return &Sender{
-		client: client,
+		client:  client,
+		baseURL: defaultBaseURL,
 	}
 }
 
 func (s *Sender) SendTextMessage(
+	ctx context.Context,
 	senderPhoneNumberID string,
 	senderAccessToken string,
-	recieverPhoneNumber string,
+	receiverPhoneNumber string,
 	message string,
 ) error {
 	body := struct {
@@ -39,7 +46,7 @@ func (s *Sender) SendTextMessage(
 	}{
 		MessagingProduct: "whatsapp",
 		RecipientType:    "individual",
-		To:               recieverPhoneNumber,
+		To:               receiverPhoneNumber,
 		MessageType:      "text",
 	}
 
@@ -52,11 +59,12 @@ func (s *Sender) SendTextMessage(
 	}
 
 	url := fmt.Sprintf(
-		"https://graph.facebook.com/v26.0/%s/messages",
+		"%s/%s/messages",
+		strings.TrimRight(s.baseURL, "/"),
 		senderPhoneNumberID,
 	)
 	req, err := http.NewRequestWithContext(
-		context.Background(),
+		ctx,
 		http.MethodPost,
 		url,
 		bytes.NewReader(js),
@@ -73,6 +81,18 @@ func (s *Sender) SendTextMessage(
 	}
 
 	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		responseBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		if readErr != nil {
+			return readErr
+		}
+
+		return fmt.Errorf(
+			"WhatsApp API returned %s: %s",
+			resp.Status,
+			strings.TrimSpace(string(responseBody)),
+		)
+	}
 
 	return nil
 }

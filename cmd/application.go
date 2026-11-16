@@ -5,18 +5,22 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/helalha7/whatsapp-middleware/internal/event"
 	"github.com/helalha7/whatsapp-middleware/internal/idempotency"
 	"github.com/helalha7/whatsapp-middleware/internal/listener"
+	"github.com/helalha7/whatsapp-middleware/internal/messaging"
 	"github.com/helalha7/whatsapp-middleware/internal/queue"
+	"github.com/helalha7/whatsapp-middleware/internal/sender"
 	"github.com/helalha7/whatsapp-middleware/internal/tenant"
 	"github.com/helalha7/whatsapp-middleware/internal/worker"
 )
 
 const (
-	inboundQueueCapacity = 100
-	inboundWorkerCount   = 5
+	inboundQueueCapacity  = 100
+	inboundWorkerCount    = 5
+	inboundProcessTimeout = 15 * time.Second
 )
 
 type application struct {
@@ -34,6 +38,11 @@ func newApplication(cfg config) (*application, error) {
 
 	inboundQueue := queue.New[event.InboundMessage](inboundQueueCapacity)
 	mux := http.NewServeMux()
+	tenantsStore := &tenant.Store{DB: db}
+	messageProcessor := messaging.NewProcessor(
+		tenantsStore,
+		sender.New(&http.Client{Timeout: 10 * time.Second}),
+	)
 
 	listener.RegisterRoutes(
 		mux,
@@ -42,7 +51,7 @@ func newApplication(cfg config) (*application, error) {
 		&idempotency.Store{DB: db},
 		inboundQueue,
 	)
-	tenant.RegisterRoutes(mux, &tenant.Store{DB: db})
+	tenant.RegisterRoutes(mux, tenantsStore)
 
 	return &application{
 		db:           db,
@@ -51,7 +60,7 @@ func newApplication(cfg config) (*application, error) {
 		inboundWorkers: worker.NewPool(
 			inboundWorkerCount,
 			inboundQueue.Messages(),
-			processInboundMessage,
+			processInboundMessage(messageProcessor),
 		),
 	}, nil
 }
@@ -75,11 +84,26 @@ func (app *application) close() {
 	}
 }
 
-func processInboundMessage(message event.InboundMessage) {
-	log.Printf(
-		"processing inbound message id=%s waba_id=%s type=%s",
-		message.ID,
-		message.WABAID,
-		message.Type,
-	)
+func processInboundMessage(processor *messaging.Processor) func(event.InboundMessage) {
+	return func(message event.InboundMessage) {
+		ctx, cancel := context.WithTimeout(context.Background(), inboundProcessTimeout)
+		defer cancel()
+
+		if err := processor.Process(ctx, message); err != nil {
+			log.Printf(
+				"process inbound message id=%s waba_id=%s: %v",
+				message.ID,
+				message.WABAID,
+				err,
+			)
+			return
+		}
+
+		log.Printf(
+			"processed inbound message id=%s waba_id=%s type=%s",
+			message.ID,
+			message.WABAID,
+			message.Type,
+		)
+	}
 }

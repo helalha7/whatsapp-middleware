@@ -5,13 +5,12 @@ import (
 	"sync"
 )
 
-// helal
 type WorkerPool[T any] struct {
-	workers int
-	jobs    <-chan T
-	wg      sync.WaitGroup
-	so      sync.Once
-	process func(T)
+	workerCount int
+	jobs        <-chan T
+	process     func(T)
+	wg          sync.WaitGroup
+	startOnce   sync.Once
 }
 
 func NewPool[T any](
@@ -20,39 +19,36 @@ func NewPool[T any](
 	process func(T),
 ) *WorkerPool[T] {
 	return &WorkerPool[T]{
-		workers: workers,
-		jobs:    jobs,
-		process: process,
+		workerCount: workers,
+		jobs:        jobs,
+		process:     process,
 	}
 }
 
-func (p *WorkerPool[T]) Start(
-	ctx context.Context,
-) {
-	p.so.Do(
-		func() {
-			for i := 0; i < p.workers; i++ {
-				p.wg.Go(
-					func() {
-						for {
-							select {
-							case <-ctx.Done():
-								return
-							case event, ok := <-p.jobs:
-								if !ok {
-									return
-								}
-
-								p.process(event)
-							}
-						}
-					},
-				)
-			}
-		},
-	)
+func (p *WorkerPool[T]) Start(ctx context.Context) {
+	p.startOnce.Do(func() {
+		for i := 0; i < p.workerCount; i++ {
+			p.wg.Go(func() {
+				p.run(ctx)
+			})
+		}
+	})
 }
 
 func (p *WorkerPool[T]) Wait() {
 	p.wg.Wait()
+}
+
+func (p *WorkerPool[T]) run(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case job, ok := <-p.jobs:
+			if !ok {
+				return
+			}
+			p.process(job)
+		}
+	}
 }

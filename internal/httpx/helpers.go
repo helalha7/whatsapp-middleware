@@ -12,13 +12,16 @@ import (
 
 type Envelope map[string]any
 
-const maxJSONBodyBytes = 1048567
+const maxJSONBodyBytes = 1 << 20
 
 func ReadIdParam(r *http.Request) (int, error) {
 	idPath := r.PathValue("id")
 	id, err := strconv.Atoi(idPath)
-	if err != nil || id < 1 {
+	if err != nil {
 		return 0, err
+	}
+	if id < 1 {
+		return 0, errors.New("ID must be greater than zero")
 	}
 
 	return id, nil
@@ -51,6 +54,9 @@ func ReadJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 
 	if err := dec.Decode(dst); err != nil {
 		return decodeJSONError(err)
+	}
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return errors.New("body must contain only a single JSON value")
 	}
 	return nil
 }

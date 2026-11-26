@@ -70,8 +70,6 @@ The current architecture is suitable for development and an MVP. This document t
 
 ## Priority 6: HTTP and Validation
 
-- Make `ReadIdParam` return an error for IDs less than one.
-- Reject request bodies containing multiple JSON documents.
 - Make webhook error responses consistent.
 - Add middleware for panic recovery, request IDs, and structured logging.
 - Review webhook behavior for malformed signed events to avoid unnecessary retry loops.

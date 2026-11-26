@@ -16,6 +16,8 @@ func TestReadIdParam(t *testing.T) {
 	}{
 		{name: "valid ID", id: "42", want: 42},
 		{name: "non-numeric ID", id: "invalid", wantErr: true},
+		{name: "zero ID", id: "0", wantErr: true},
+		{name: "negative ID", id: "-1", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -88,6 +90,7 @@ func TestReadJSON(t *testing.T) {
 		{name: "empty body", wantError: "body must not be empty"},
 		{name: "incorrect type", body: `{"name":42}`, wantError: `body contains incorrect JSON type for field "name"`},
 		{name: "unknown field", body: `{"name":"Ada","extra":true}`, wantError: `body contains unknown key "extra"`},
+		{name: "multiple JSON values", body: `{"name":"Ada"}{"name":"Grace"}`, wantError: "body must contain only a single JSON value"},
 	}
 
 	for _, tt := range tests {

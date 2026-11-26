@@ -18,8 +18,11 @@ Buffered in-memory queue
 Worker pool
     ↓
 Messaging processor
-    ├── Tenant access-token lookup
-    └── WhatsApp sender
+    ├── Tenant and access-token lookup
+    ├── Conversation upsert
+    ├── Inbound message persistence
+    ├── WhatsApp sender
+    └── Outbound message persistence
             ↓
       Echoed text response
 ```
@@ -32,6 +35,8 @@ Messaging processor
 | `internal/listener` | Meta verification, signature validation, payload parsing and normalization |
 | `internal/event` | Normalized inbound event types |
 | `internal/idempotency` | Records received WhatsApp message IDs |
+| `internal/conversation` | Persists tenant-scoped customer conversations |
+| `internal/message` | Persists conversation messages and updates conversation activity |
 | `internal/queue` | Generic buffered in-memory queue |
 | `internal/worker` | Generic concurrent worker pool |
 | `internal/messaging` | Coordinates inbound message processing and responses |

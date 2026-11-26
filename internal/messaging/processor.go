@@ -4,11 +4,26 @@ import (
 	"context"
 	"errors"
 
+	"github.com/helalha7/whatsapp-middleware/internal/conversation"
 	"github.com/helalha7/whatsapp-middleware/internal/event"
+	messagedomain "github.com/helalha7/whatsapp-middleware/internal/message"
 )
 
-type accessTokenStore interface {
-	GetAccessToken(ctx context.Context, wabaID string) (string, error)
+type tenantCredentialsStore interface {
+	GetMessagingCredentials(ctx context.Context, wabaID string) (int64, string, error)
+}
+
+type conversationStore interface {
+	Upsert(
+		ctx context.Context,
+		tenantID int64,
+		customerWAID string,
+		customerName string,
+	) (*conversation.Conversation, error)
+}
+
+type messageStore interface {
+	Insert(ctx context.Context, message *messagedomain.Message) error
 }
 
 type textMessageSender interface {
@@ -22,17 +37,23 @@ type textMessageSender interface {
 }
 
 type Processor struct {
-	accessTokens accessTokenStore
-	sender       textMessageSender
+	tenants       tenantCredentialsStore
+	conversations conversationStore
+	messages      messageStore
+	sender        textMessageSender
 }
 
 func NewProcessor(
-	accessTokens accessTokenStore,
+	tenants tenantCredentialsStore,
+	conversations conversationStore,
+	messages messageStore,
 	sender textMessageSender,
 ) *Processor {
 	return &Processor{
-		accessTokens: accessTokens,
-		sender:       sender,
+		tenants:       tenants,
+		conversations: conversations,
+		messages:      messages,
+		sender:        sender,
 	}
 }
 
@@ -47,16 +68,42 @@ func (p *Processor) Process(
 		return errors.New("inbound text message has no text content")
 	}
 
-	accessToken, err := p.accessTokens.GetAccessToken(ctx, message.WABAID)
+	tenantID, accessToken, err := p.tenants.GetMessagingCredentials(ctx, message.WABAID)
 	if err != nil {
 		return err
 	}
 
-	return p.sender.SendTextMessage(
+	conversation, err := p.conversations.Upsert(
+		ctx,
+		tenantID,
+		message.From,
+		message.ContactName,
+	)
+	if err != nil {
+		return err
+	}
+	if err := p.messages.Insert(ctx, &messagedomain.Message{
+		ConversationID:    conversation.ID,
+		WhatsAppMessageID: message.ID,
+		Direction:         messagedomain.DirectionInbound,
+		Content:           message.Text.Body,
+	}); err != nil {
+		return err
+	}
+
+	if err := p.sender.SendTextMessage(
 		ctx,
 		message.PhoneNumberID,
 		accessToken,
 		message.From,
 		message.Text.Body,
-	)
+	); err != nil {
+		return err
+	}
+
+	return p.messages.Insert(ctx, &messagedomain.Message{
+		ConversationID: conversation.ID,
+		Direction:      messagedomain.DirectionOutbound,
+		Content:        message.Text.Body,
+	})
 }

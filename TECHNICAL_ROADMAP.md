@@ -21,7 +21,7 @@ The current architecture is suitable for development and an MVP. This document t
 
 - Preserve ordering for messages from the same tenant and WhatsApp user.
 - Prevent concurrent workers from updating the same conversation state.
-- Define a conversation key, likely `tenant_id + sender_wa_id`.
+- Use the persisted conversation key `tenant_id + customer_wa_id` throughout message processing.
 
 ### Completion criteria
 
@@ -34,7 +34,7 @@ The current architecture is suitable for development and an MVP. This document t
 - Do not report ignored message types as successfully processed.
 - Add support for required media types such as images, audio, documents, and video.
 - Introduce an AI responder interface in `internal/messaging` when AI integration begins.
-- Persist conversation context required by the AI workflow.
+- Use the persisted message history as context when the AI workflow is introduced.
 
 ### Completion criteria
 

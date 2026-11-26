@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/helalha7/whatsapp-middleware/internal/conversation"
 	"github.com/helalha7/whatsapp-middleware/internal/event"
 	"github.com/helalha7/whatsapp-middleware/internal/idempotency"
 	"github.com/helalha7/whatsapp-middleware/internal/listener"
+	"github.com/helalha7/whatsapp-middleware/internal/message"
 	"github.com/helalha7/whatsapp-middleware/internal/messaging"
 	"github.com/helalha7/whatsapp-middleware/internal/queue"
 	"github.com/helalha7/whatsapp-middleware/internal/sender"
@@ -39,8 +41,12 @@ func newApplication(cfg config) (*application, error) {
 	inboundQueue := queue.New[event.InboundMessage](inboundQueueCapacity)
 	mux := http.NewServeMux()
 	tenantsStore := &tenant.Store{DB: db}
+	conversationsStore := &conversation.Store{DB: db}
+	messagesStore := &message.Store{DB: db}
 	messageProcessor := messaging.NewProcessor(
 		tenantsStore,
+		conversationsStore,
+		messagesStore,
 		sender.New(&http.Client{Timeout: 10 * time.Second}),
 	)
 

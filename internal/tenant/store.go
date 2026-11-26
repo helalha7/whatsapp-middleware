@@ -101,27 +101,32 @@ func (s *Store) Get(
 	return &t, nil
 }
 
-func (s *Store) GetAccessToken(ctx context.Context, wabaID string) (string, error) {
+func (s *Store) GetMessagingCredentials(
+	ctx context.Context,
+	wabaID string,
+) (int64, string, error) {
 	query := `
-		SELECT access_token
+		SELECT id, access_token
 		FROM tenants
 		WHERE waba_id = ?
 	`
 	args := []any{wabaID}
 	row := s.DB.QueryRowContext(ctx, query, args...)
 
+	var tenantID int64
 	var accessToken string
 	err := row.Scan(
+		&tenantID,
 		&accessToken,
 	)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			return "", data.ErrRecordNotFound
+			return 0, "", data.ErrRecordNotFound
 		default:
-			return "", err
+			return 0, "", err
 		}
 	}
 
-	return accessToken, nil
+	return tenantID, accessToken, nil
 }

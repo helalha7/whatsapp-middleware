@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/helalha7/whatsapp-middleware/internal/chatsession"
 	"github.com/helalha7/whatsapp-middleware/internal/conversation"
 	"github.com/helalha7/whatsapp-middleware/internal/event"
 	"github.com/helalha7/whatsapp-middleware/internal/idempotency"
@@ -42,12 +43,15 @@ func newApplication(cfg config) (*application, error) {
 	mux := http.NewServeMux()
 	tenantsStore := &tenant.Store{DB: db}
 	conversationsStore := &conversation.Store{DB: db}
+	chatSessionsStore := &chatsession.Store{DB: db}
 	messagesStore := &message.Store{DB: db}
 	messageProcessor := messaging.NewProcessor(
 		tenantsStore,
 		conversationsStore,
+		chatSessionsStore,
 		messagesStore,
 		sender.New(&http.Client{Timeout: 10 * time.Second}),
+		cfg.ai.sessionIdleTimeout,
 	)
 
 	listener.RegisterRoutes(

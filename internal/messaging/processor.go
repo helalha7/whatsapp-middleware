@@ -3,7 +3,10 @@ package messaging
 import (
 	"context"
 	"errors"
+	"strings"
+	"time"
 
+	"github.com/helalha7/whatsapp-middleware/internal/chatsession"
 	"github.com/helalha7/whatsapp-middleware/internal/conversation"
 	"github.com/helalha7/whatsapp-middleware/internal/event"
 	messagedomain "github.com/helalha7/whatsapp-middleware/internal/message"
@@ -22,8 +25,21 @@ type conversationStore interface {
 	) (*conversation.Conversation, error)
 }
 
+type chatSessionStore interface {
+	StartOrContinue(
+		ctx context.Context,
+		conversationID int64,
+		idleTimeout time.Duration,
+	) (*chatsession.Session, error)
+}
+
 type messageStore interface {
 	Insert(ctx context.Context, message *messagedomain.Message) error
+	ListBySessionThrough(
+		ctx context.Context,
+		chatSessionID int64,
+		messageID int64,
+	) ([]messagedomain.Message, error)
 }
 
 type textMessageSender interface {
@@ -37,23 +53,29 @@ type textMessageSender interface {
 }
 
 type Processor struct {
-	tenants       tenantCredentialsStore
-	conversations conversationStore
-	messages      messageStore
-	sender        textMessageSender
+	tenants            tenantCredentialsStore
+	conversations      conversationStore
+	chatSessions       chatSessionStore
+	messages           messageStore
+	sender             textMessageSender
+	sessionIdleTimeout time.Duration
 }
 
 func NewProcessor(
 	tenants tenantCredentialsStore,
 	conversations conversationStore,
+	chatSessions chatSessionStore,
 	messages messageStore,
 	sender textMessageSender,
+	sessionIdleTimeout time.Duration,
 ) *Processor {
 	return &Processor{
-		tenants:       tenants,
-		conversations: conversations,
-		messages:      messages,
-		sender:        sender,
+		tenants:            tenants,
+		conversations:      conversations,
+		chatSessions:       chatSessions,
+		messages:           messages,
+		sender:             sender,
+		sessionIdleTimeout: sessionIdleTimeout,
 	}
 }
 
@@ -82,28 +104,60 @@ func (p *Processor) Process(
 	if err != nil {
 		return err
 	}
-	if err := p.messages.Insert(ctx, &messagedomain.Message{
+	chatSession, err := p.chatSessions.StartOrContinue(
+		ctx,
+		conversation.ID,
+		p.sessionIdleTimeout,
+	)
+	if err != nil {
+		return err
+	}
+
+	inboundMessage := &messagedomain.Message{
 		ConversationID:    conversation.ID,
+		ChatSessionID:     chatSession.ID,
 		WhatsAppMessageID: message.ID,
 		Direction:         messagedomain.DirectionInbound,
 		Content:           message.Text.Body,
-	}); err != nil {
+	}
+	if err := p.messages.Insert(ctx, inboundMessage); err != nil {
 		return err
 	}
+
+	sessionMessages, err := p.messages.ListBySessionThrough(
+		ctx,
+		chatSession.ID,
+		inboundMessage.ID,
+	)
+	if err != nil {
+		return err
+	}
+	echo := buildSessionEcho(sessionMessages)
 
 	if err := p.sender.SendTextMessage(
 		ctx,
 		message.PhoneNumberID,
 		accessToken,
 		message.From,
-		message.Text.Body,
+		echo,
 	); err != nil {
 		return err
 	}
 
 	return p.messages.Insert(ctx, &messagedomain.Message{
 		ConversationID: conversation.ID,
+		ChatSessionID:  chatSession.ID,
 		Direction:      messagedomain.DirectionOutbound,
-		Content:        message.Text.Body,
+		Content:        echo,
 	})
+}
+
+func buildSessionEcho(messages []messagedomain.Message) string {
+	contents := make([]string, 0, len(messages))
+	for _, message := range messages {
+		if message.Direction == messagedomain.DirectionInbound {
+			contents = append(contents, message.Content)
+		}
+	}
+	return strings.Join(contents, "\n")
 }

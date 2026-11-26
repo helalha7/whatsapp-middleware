@@ -20,7 +20,9 @@ Worker pool
 Messaging processor
     ├── Tenant and access-token lookup
     ├── Conversation upsert
-    ├── Inbound message persistence
+    ├── Active chat-session selection
+    ├── Inbound message persistence and session activity update
+    ├── Active-session history lookup
     ├── WhatsApp sender
     └── Outbound message persistence
             ↓
@@ -36,7 +38,8 @@ Messaging processor
 | `internal/event` | Normalized inbound event types |
 | `internal/idempotency` | Records received WhatsApp message IDs |
 | `internal/conversation` | Persists tenant-scoped customer conversations |
-| `internal/message` | Persists conversation messages and updates conversation activity |
+| `internal/chatsession` | Starts or continues inactivity-based chatbot sessions |
+| `internal/message` | Persists inbound and outbound messages and updates conversation activity |
 | `internal/queue` | Generic buffered in-memory queue |
 | `internal/worker` | Generic concurrent worker pool |
 | `internal/messaging` | Coordinates inbound message processing and responses |
@@ -72,6 +75,7 @@ Configure these values:
 | `verify_token` | Token chosen for Meta webhook verification |
 | `app_secret` | Meta application secret used to verify webhook signatures |
 | `db_dsn` | MySQL DSN used by the service |
+| `ai_session_idle_timeout` | Inactivity before a new chat session starts; defaults to `10m` |
 
 Do not commit `.env` or real access tokens.
 
@@ -125,6 +129,14 @@ The `waba_id` must match `entry[].id` in incoming Meta webhook payloads.
 
 > Tenant administration endpoints are currently unauthenticated and must not be exposed publicly in production.
 
+## Chat Sessions
+
+Inbound and outbound messages are assigned to the same chat session. Both
+directions update session activity, and a new session begins after the
+configured inactivity timeout. Session history queries return both directions
+for future AI context. The temporary echo response renders only inbound text to
+avoid recursively embedding earlier transcript echoes.
+
 ## Configure the Meta Webhook
 
 Configure the callback URL as:
@@ -150,7 +162,7 @@ goose -dir migrations validate
 
 - The queue is in memory and messages are lost if the process exits before processing them.
 - Processing failures are logged but not retried.
-- Only text messages currently receive an echoed response.
+- Only text messages currently receive a response; the temporary response echoes all customer messages in the active chat session.
 - Interactive messages are normalized but currently ignored by the messaging processor.
 - Processing order is not guaranteed per conversation.
 - Tenant access tokens are stored in MySQL as plaintext.

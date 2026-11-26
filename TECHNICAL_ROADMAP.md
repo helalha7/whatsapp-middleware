@@ -22,6 +22,7 @@ The current architecture is suitable for development and an MVP. This document t
 - Preserve ordering for messages from the same tenant and WhatsApp user.
 - Prevent concurrent workers from updating the same conversation state.
 - Use the persisted conversation key `tenant_id + customer_wa_id` throughout message processing.
+- Chat sessions currently reset after a configurable inactivity timeout, but processing must still be serialized per conversation before AI integration.
 
 ### Completion criteria
 

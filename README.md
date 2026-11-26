@@ -36,6 +36,7 @@ Messaging processor
 | `cmd` | Configuration, dependency wiring, server and worker lifecycle |
 | `internal/listener` | Meta verification, signature validation, payload parsing and normalization |
 | `internal/event` | Normalized inbound event types |
+| `internal/data` | Shared persistence errors, MySQL inspection and list pagination primitives |
 | `internal/idempotency` | Deduplicates inbound webhook handoff; it does not track processing completion |
 | `internal/conversation` | Persists tenant-scoped customer conversations |
 | `internal/chatsession` | Starts or continues inactivity-based chatbot sessions |
@@ -45,7 +46,7 @@ Messaging processor
 | `internal/messaging` | Coordinates inbound message processing and responses |
 | `internal/sender` | Sends messages through the WhatsApp Cloud API |
 | `internal/tenant` | Tenant model, persistence and HTTP endpoints |
-| `internal/httpx` | Shared HTTP and JSON helpers |
+| `internal/httpx` | Shared HTTP, JSON and query-parameter helpers |
 
 ## Requirements
 

@@ -3,17 +3,13 @@ package idempotency
 import (
 	"context"
 	"database/sql"
-	"errors"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/helalha7/whatsapp-middleware/internal/data"
 )
 
 type Store struct {
 	DB *sql.DB
 }
-
-const mysqlDuplicateEntryErrorNumber uint16 = 1062
 
 // RegisterInboundMessage records a WhatsApp message before queue handoff. It
 // returns true for the first delivery and false when the receipt already
@@ -33,8 +29,7 @@ func (s *Store) RegisterInboundMessage(
 
 	result, err := s.DB.ExecContext(ctx, query, messageID, wabaID)
 	if err != nil {
-		var mysqlErr *mysql.MySQLError
-		if errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlDuplicateEntryErrorNumber {
+		if data.IsDuplicateError(err) {
 			return false, nil
 		}
 

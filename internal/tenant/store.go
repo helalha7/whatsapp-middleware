@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/helalha7/whatsapp-middleware/internal/data"
 )
 
@@ -34,8 +33,7 @@ func (s *Store) Insert(ctx context.Context, tenant *Tenant) error {
 
 	result, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
-		var mysqlErr *mysql.MySQLError
-		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+		if data.IsDuplicateError(err) {
 			return data.ErrDuplicateRecord
 		}
 		return err

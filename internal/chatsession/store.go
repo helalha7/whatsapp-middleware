@@ -6,7 +6,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/helalha7/whatsapp-middleware/internal/data"
 )
 
@@ -125,8 +124,7 @@ func insert(
 	`
 	result, err := tx.ExecContext(ctx, query, conversationID)
 	if err != nil {
-		var mysqlErr *mysql.MySQLError
-		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1452 {
+		if data.IsForeignKeyViolation(err) {
 			return 0, data.ErrRecordNotFound
 		}
 		return 0, err

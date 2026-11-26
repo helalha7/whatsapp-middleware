@@ -3,9 +3,7 @@ package message
 import (
 	"context"
 	"database/sql"
-	"errors"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/helalha7/whatsapp-middleware/internal/data"
 )
 
@@ -181,15 +179,10 @@ func scanMessages(rows *sql.Rows) ([]Message, error) {
 }
 
 func translateDriverError(err error) error {
-	var mysqlErr *mysql.MySQLError
-	if !errors.As(err, &mysqlErr) {
-		return err
-	}
-
-	switch mysqlErr.Number {
-	case 1062:
+	switch {
+	case data.IsDuplicateError(err):
 		return data.ErrDuplicateRecord
-	case 1452:
+	case data.IsForeignKeyViolation(err):
 		return data.ErrRecordNotFound
 	default:
 		return err

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/helalha7/whatsapp-middleware/internal/data"
 )
 
@@ -26,8 +25,7 @@ func (s *Store) Upsert(
 	`
 	_, err := s.DB.ExecContext(ctx, query, tenantID, customerWAID, customerName)
 	if err != nil {
-		var mysqlErr *mysql.MySQLError
-		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1452 {
+		if data.IsForeignKeyViolation(err) {
 			return nil, data.ErrRecordNotFound
 		}
 		return nil, err

@@ -22,18 +22,128 @@ type stubMessageRegistry struct {
 type stubInboundPublisher struct {
 	messages []event.InboundMessage
 	err      error
+	publish  func(context.Context, event.InboundMessage) error
 }
 
 func (p *stubInboundPublisher) Publish(
-	_ context.Context,
+	ctx context.Context,
 	message event.InboundMessage,
 ) error {
+	if p.publish != nil {
+		return p.publish(ctx, message)
+	}
 	if p.err != nil {
 		return p.err
 	}
 
 	p.messages = append(p.messages, message)
 	return nil
+}
+
+func TestHandleNotificationProcessesBatch(t *testing.T) {
+	body := strings.Replace(
+		validWebhookPayload(),
+		`"messages":[{`,
+		`"messages":[{
+						"from":"15551234567",
+						"id":"wamid.first",
+						"timestamp":"1794311999",
+						"type":"text",
+						"text":{"body":"First"}
+					},{`,
+		1,
+	)
+
+	registered := make([]string, 0, 2)
+	registry := &stubMessageRegistry{
+		register: func(_ context.Context, _ string, messageID string) (bool, error) {
+			registered = append(registered, messageID)
+			return true, nil
+		},
+	}
+	publisher := &stubInboundPublisher{}
+	h := &handler{
+		appSecret:        "test-secret",
+		messageRegistry:  registry,
+		inboundPublisher: publisher,
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/webhooks", strings.NewReader(body))
+	request.Header.Set("X-Hub-Signature-256", signPayload(body, "test-secret"))
+	recorder := httptest.NewRecorder()
+
+	h.handleNotification(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
+	}
+	if len(registered) != 2 || len(publisher.messages) != 2 {
+		t.Fatalf("expected 2 registered and published messages, got registered=%d published=%d", len(registered), len(publisher.messages))
+	}
+	if publisher.messages[0].ID != "wamid.first" || publisher.messages[1].ID != "wamid.message-id" {
+		t.Errorf("unexpected published messages: %+v", publisher.messages)
+	}
+}
+
+func TestPublishEventsHandlesMixedBatch(t *testing.T) {
+	events := []event.InboundMessage{
+		{ID: "wamid.duplicate", WABAID: "waba-id"},
+		{ID: "wamid.new", WABAID: "waba-id"},
+	}
+	registry := &stubMessageRegistry{
+		register: func(_ context.Context, _ string, messageID string) (bool, error) {
+			return messageID == "wamid.new", nil
+		},
+	}
+	publisher := &stubInboundPublisher{}
+	h := &handler{messageRegistry: registry, inboundPublisher: publisher}
+
+	err := h.publishEvents(context.Background(), context.Background(), events)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(publisher.messages) != 1 || publisher.messages[0].ID != "wamid.new" {
+		t.Fatalf("expected only new message to be published, got %+v", publisher.messages)
+	}
+}
+
+func TestPublishEventsReleasesFailedMessageInBatch(t *testing.T) {
+	queueError := errors.New("queue unavailable")
+	events := []event.InboundMessage{
+		{ID: "wamid.first", WABAID: "waba-id"},
+		{ID: "wamid.second", WABAID: "waba-id"},
+	}
+	releasedID := ""
+	registry := &stubMessageRegistry{
+		register: func(context.Context, string, string) (bool, error) {
+			return true, nil
+		},
+		release: func(_ context.Context, _ string, messageID string) error {
+			releasedID = messageID
+			return nil
+		},
+	}
+	published := make([]string, 0, 1)
+	publisher := &stubInboundPublisher{
+		publish: func(_ context.Context, message event.InboundMessage) error {
+			if message.ID == "wamid.second" {
+				return queueError
+			}
+			published = append(published, message.ID)
+			return nil
+		},
+	}
+	h := &handler{messageRegistry: registry, inboundPublisher: publisher}
+
+	err := h.publishEvents(context.Background(), context.Background(), events)
+	if !errors.Is(err, queueError) {
+		t.Fatalf("expected error %v, got %v", queueError, err)
+	}
+	if len(published) != 1 || published[0] != "wamid.first" {
+		t.Errorf("unexpected published messages: %v", published)
+	}
+	if releasedID != "wamid.second" {
+		t.Errorf("expected failed message to be released, got %q", releasedID)
+	}
 }
 
 func (s *stubMessageRegistry) RegisterInboundMessage(

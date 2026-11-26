@@ -36,7 +36,7 @@ Messaging processor
 | `cmd` | Configuration, dependency wiring, server and worker lifecycle |
 | `internal/listener` | Meta verification, signature validation, payload parsing and normalization |
 | `internal/event` | Normalized inbound event types |
-| `internal/idempotency` | Records received WhatsApp message IDs |
+| `internal/idempotency` | Deduplicates inbound webhook handoff; it does not track processing completion |
 | `internal/conversation` | Persists tenant-scoped customer conversations |
 | `internal/chatsession` | Starts or continues inactivity-based chatbot sessions |
 | `internal/message` | Persists inbound and outbound messages and updates conversation activity |
@@ -148,6 +148,7 @@ https://YOUR_PUBLIC_HOST/v1/webhooks
 Use the same value configured as `verify_token`, subscribe to the `messages` field, and ensure Meta can reach the service over HTTPS.
 
 Webhook notifications must include a valid `X-Hub-Signature-256` generated with the configured Meta app secret.
+Malformed notifications for supported message types are rejected, while unrelated changes and unsupported message types are deliberately acknowledged and ignored.
 
 ## Test and Validate
 

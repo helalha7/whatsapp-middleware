@@ -13,8 +13,12 @@ type Store struct {
 	DB *sql.DB
 }
 
-// RegisterInboundMessage records a WhatsApp message as received. It returns
-// true for the first delivery and false when the message was already received.
+const mysqlDuplicateEntryErrorNumber uint16 = 1062
+
+// RegisterInboundMessage records a WhatsApp message before queue handoff. It
+// returns true for the first delivery and false when the receipt already
+// exists. Registration deduplicates webhook delivery; it does not mean that
+// message processing has completed.
 func (s *Store) RegisterInboundMessage(
 	ctx context.Context,
 	wabaID string,
@@ -30,7 +34,7 @@ func (s *Store) RegisterInboundMessage(
 	result, err := s.DB.ExecContext(ctx, query, messageID, wabaID)
 	if err != nil {
 		var mysqlErr *mysql.MySQLError
-		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlDuplicateEntryErrorNumber {
 			return false, nil
 		}
 

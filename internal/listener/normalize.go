@@ -1,15 +1,14 @@
 package listener
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/helalha7/whatsapp-middleware/internal/event"
 )
 
-func normalizePayload(
-	p payload,
-) ([]event.InboundMessage, error) {
+func normalizePayload(p payload) ([]event.InboundMessage, error) {
 	var events []event.InboundMessage
 
 	for _, entry := range p.Entry {
@@ -26,106 +25,147 @@ func normalizePayload(
 				)
 			}
 			if len(value.Messages) > 0 && entry.ID == "" {
-				return nil, fmt.Errorf("missing WABA ID")
+				return nil, errors.New("missing WABA ID")
 			}
 
-			for _, msg := range value.Messages {
-				if msg.ID == "" {
-					return nil, fmt.Errorf("missing message ID")
-				}
-
-				e := event.InboundMessage{
-					ID:                 msg.ID,
-					WABAID:             entry.ID,
-					PhoneNumberID:      value.Metadata.PhoneNumberID,
-					DisplayPhoneNumber: value.Metadata.DisplayPhoneNumber,
-					From:               msg.From,
-				}
-
-				// Find the contact associated with this message.
-				for _, contact := range value.Contacts {
-					if contact.WAID == msg.From {
-						e.ContactName = contact.Profile.Name
-						break
-					}
-				}
-
-				// Convert the WhatsApp timestamp to int64.
-				timestamp, err := strconv.ParseInt(msg.Timestamp, 10, 64)
+			contactNames := indexContactNames(value.Contacts)
+			for _, message := range value.Messages {
+				normalized, supported, err := normalizeMessage(
+					entry.ID,
+					value.Metadata,
+					contactNames,
+					message,
+				)
 				if err != nil {
-					return nil, fmt.Errorf(
-						"invalid timestamp for message %s: %w",
-						msg.ID, err,
-					)
+					return nil, err
 				}
-				e.Timestamp = timestamp
-
-				switch msg.Type {
-				case "text":
-					if msg.Text == nil {
-						return nil, fmt.Errorf(
-							"missing text content for message %s",
-							msg.ID,
-						)
-					}
-
-					e.Type = event.MessageTypeText
-					e.Text = &event.TextContent{
-						Body: msg.Text.Body,
-					}
-
-				case "interactive":
-					if msg.Interactive == nil {
-						return nil, fmt.Errorf(
-							"missing interactive content for message %s",
-							msg.ID,
-						)
-					}
-
-					e.Type = event.MessageTypeInteractive
-
-					switch msg.Interactive.Type {
-					case "button_reply":
-						if msg.Interactive.ButtonReply == nil {
-							return nil, fmt.Errorf(
-								"missing button reply for message %s",
-								msg.ID,
-							)
-						}
-
-						e.Interactive = &event.InteractiveReply{
-							Type:  event.InteractiveButtonReply,
-							ID:    msg.Interactive.ButtonReply.ID,
-							Title: msg.Interactive.ButtonReply.Title,
-						}
-
-					case "list_reply":
-						if msg.Interactive.ListReply == nil {
-							return nil, fmt.Errorf(
-								"missing list reply for message %s",
-								msg.ID,
-							)
-						}
-
-						e.Interactive = &event.InteractiveReply{
-							Type:  event.InteractiveListReply,
-							ID:    msg.Interactive.ListReply.ID,
-							Title: msg.Interactive.ListReply.Title,
-						}
-
-					default:
-						continue
-					}
-
-				default:
-					// Ignore unsupported message types.
-					continue
+				if supported {
+					events = append(events, normalized)
 				}
-
-				events = append(events, e)
 			}
 		}
 	}
 
 	return events, nil
+}
+
+func normalizeMessage(
+	wabaID string,
+	metadata metadata,
+	contactNames map[string]string,
+	msg message,
+) (event.InboundMessage, bool, error) {
+	if msg.Type != "text" && msg.Type != "interactive" {
+		return event.InboundMessage{}, false, nil
+	}
+	if msg.ID == "" {
+		return event.InboundMessage{}, false, errors.New("missing message ID")
+	}
+	if msg.From == "" {
+		return event.InboundMessage{}, false, fmt.Errorf(
+			"missing sender for message %s",
+			msg.ID,
+		)
+	}
+	if metadata.PhoneNumberID == "" {
+		return event.InboundMessage{}, false, fmt.Errorf(
+			"missing phone number ID for message %s",
+			msg.ID,
+		)
+	}
+
+	timestamp, err := strconv.ParseInt(msg.Timestamp, 10, 64)
+	if err != nil {
+		return event.InboundMessage{}, false, fmt.Errorf(
+			"invalid timestamp for message %s: %w",
+			msg.ID,
+			err,
+		)
+	}
+
+	normalized := event.InboundMessage{
+		ID:                 msg.ID,
+		WABAID:             wabaID,
+		PhoneNumberID:      metadata.PhoneNumberID,
+		DisplayPhoneNumber: metadata.DisplayPhoneNumber,
+		From:               msg.From,
+		ContactName:        contactNames[msg.From],
+		Timestamp:          timestamp,
+	}
+
+	switch msg.Type {
+	case "text":
+		if err := normalizeText(&normalized, msg); err != nil {
+			return event.InboundMessage{}, false, err
+		}
+	case "interactive":
+		supported, err := normalizeInteractive(&normalized, msg)
+		if err != nil || !supported {
+			return event.InboundMessage{}, supported, err
+		}
+	}
+
+	return normalized, true, nil
+}
+
+func normalizeText(normalized *event.InboundMessage, msg message) error {
+	if msg.Text == nil {
+		return fmt.Errorf("missing text content for message %s", msg.ID)
+	}
+
+	normalized.Type = event.MessageTypeText
+	normalized.Text = &event.TextContent{Body: msg.Text.Body}
+	return nil
+}
+
+func normalizeInteractive(
+	normalized *event.InboundMessage,
+	msg message,
+) (bool, error) {
+	if msg.Interactive == nil {
+		return false, fmt.Errorf(
+			"missing interactive content for message %s",
+			msg.ID,
+		)
+	}
+
+	normalized.Type = event.MessageTypeInteractive
+	switch msg.Interactive.Type {
+	case "button_reply":
+		if msg.Interactive.ButtonReply == nil {
+			return false, fmt.Errorf(
+				"missing button reply for message %s",
+				msg.ID,
+			)
+		}
+		normalized.Interactive = &event.InteractiveReply{
+			Type:  event.InteractiveButtonReply,
+			ID:    msg.Interactive.ButtonReply.ID,
+			Title: msg.Interactive.ButtonReply.Title,
+		}
+	case "list_reply":
+		if msg.Interactive.ListReply == nil {
+			return false, fmt.Errorf(
+				"missing list reply for message %s",
+				msg.ID,
+			)
+		}
+		normalized.Interactive = &event.InteractiveReply{
+			Type:  event.InteractiveListReply,
+			ID:    msg.Interactive.ListReply.ID,
+			Title: msg.Interactive.ListReply.Title,
+		}
+	default:
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func indexContactNames(contacts []contact) map[string]string {
+	names := make(map[string]string, len(contacts))
+	for _, contact := range contacts {
+		names[contact.WAID] = contact.Profile.Name
+	}
+	return names
 }

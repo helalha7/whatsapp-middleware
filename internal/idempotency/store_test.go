@@ -12,12 +12,13 @@ import (
 
 func TestRegisterInboundMessage(t *testing.T) {
 	tests := []struct {
-		name      string
-		execError error
-		rows      int64
-		wantNew   bool
-		wantError bool
-		errorIs   error
+		name        string
+		execError   error
+		resultError error
+		rows        int64
+		wantNew     bool
+		wantError   bool
+		errorIs     error
 	}{
 		{
 			name:    "first delivery",
@@ -32,6 +33,16 @@ func TestRegisterInboundMessage(t *testing.T) {
 		{
 			name:      "database error",
 			execError: errors.New("database unavailable"),
+			wantError: true,
+		},
+		{
+			name:        "rows affected error",
+			resultError: errors.New("result unavailable"),
+			wantError:   true,
+		},
+		{
+			name:      "unexpected MySQL error",
+			execError: &mysql.MySQLError{Number: 1205, Message: "lock wait timeout"},
 			wantError: true,
 		},
 		{
@@ -53,6 +64,8 @@ func TestRegisterInboundMessage(t *testing.T) {
 				WithArgs("wamid.message-id", "2161887421343402")
 			if tt.execError != nil {
 				expectation.WillReturnError(tt.execError)
+			} else if tt.resultError != nil {
+				expectation.WillReturnResult(sqlmock.NewErrorResult(tt.resultError))
 			} else {
 				expectation.WillReturnResult(sqlmock.NewResult(0, tt.rows))
 			}
@@ -73,8 +86,14 @@ func TestRegisterInboundMessage(t *testing.T) {
 			if tt.errorIs != nil && !errors.Is(err, tt.errorIs) {
 				t.Fatalf("expected error %v, got %v", tt.errorIs, err)
 			}
-			if tt.wantError && tt.errorIs == nil && err != tt.execError {
-				t.Fatalf("expected original database error, got %v", err)
+			if tt.wantError && tt.errorIs == nil {
+				wantError := tt.execError
+				if tt.resultError != nil {
+					wantError = tt.resultError
+				}
+				if err != wantError {
+					t.Fatalf("expected original database error %v, got %v", wantError, err)
+				}
 			}
 			if isNew != tt.wantNew {
 				t.Errorf("expected isNew %t, got %t", tt.wantNew, isNew)
@@ -91,8 +110,10 @@ func TestReleaseInboundMessage(t *testing.T) {
 	tests := []struct {
 		name      string
 		execError error
+		rows      int64
 	}{
-		{name: "releases message"},
+		{name: "releases message", rows: 1},
+		{name: "missing registration is already released"},
 		{name: "returns database error", execError: databaseError},
 	}
 
@@ -109,7 +130,7 @@ func TestReleaseInboundMessage(t *testing.T) {
 			if tt.execError != nil {
 				expectation.WillReturnError(tt.execError)
 			} else {
-				expectation.WillReturnResult(sqlmock.NewResult(0, 1))
+				expectation.WillReturnResult(sqlmock.NewResult(0, tt.rows))
 			}
 
 			store := &Store{DB: db}

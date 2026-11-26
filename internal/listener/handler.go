@@ -26,6 +26,17 @@ type inboundPublisher interface {
 	Publish(ctx context.Context, message event.InboundMessage) error
 }
 
+const (
+	maxWebhookBodyBytes = 1 << 20
+	webhookWorkTimeout  = 5 * time.Second
+)
+
+var (
+	errInvalidNotificationJSON    = errors.New("invalid notification JSON")
+	errInvalidNotificationPayload = errors.New("invalid notification payload")
+	errNormalizeNotification      = errors.New("normalize notification")
+)
+
 type handler struct {
 	verifyToken      string
 	appSecret        string
@@ -74,7 +85,7 @@ func (h *handler) handleNotification(
 	r *http.Request,
 ) {
 	body, err := io.ReadAll(
-		http.MaxBytesReader(w, r.Body, 1<<20),
+		http.MaxBytesReader(w, r.Body, maxWebhookBodyBytes),
 	)
 	if err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -90,25 +101,51 @@ func (h *handler) handleNotification(
 		return
 	}
 
-	var payload payload
-	if err := json.Unmarshal(body, &payload); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	events, err := decodeNotification(body)
+	if err != nil {
+		switch {
+		case errors.Is(err, errInvalidNotificationJSON):
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+		case errors.Is(err, errNormalizeNotification):
+			http.Error(w, "failed to normalize payload", http.StatusBadRequest)
+		default:
+			http.Error(w, "invalid webhook payload", http.StatusBadRequest)
+		}
 		return
 	}
-	if err := validatePayload(payload); err != nil {
-		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
+
+	ctx, cancel := context.WithTimeout(r.Context(), webhookWorkTimeout)
+	defer cancel()
+
+	if err := h.publishEvents(ctx, r.Context(), events); err != nil {
+		httpx.ServerErrorResponse(w, r, err)
 		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func decodeNotification(body []byte) ([]event.InboundMessage, error) {
+	var payload payload
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("%w: %v", errInvalidNotificationJSON, err)
+	}
+	if err := validatePayload(payload); err != nil {
+		return nil, fmt.Errorf("%w: %v", errInvalidNotificationPayload, err)
 	}
 
 	events, err := normalizePayload(payload)
 	if err != nil {
-		http.Error(w, "failed to normalize payload", http.StatusBadRequest)
-		return
+		return nil, fmt.Errorf("%w: %v", errNormalizeNotification, err)
 	}
+	return events, nil
+}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-
+func (h *handler) publishEvents(
+	ctx context.Context,
+	releaseBaseCtx context.Context,
+	events []event.InboundMessage,
+) error {
 	for _, event := range events {
 		isNew, err := h.messageRegistry.RegisterInboundMessage(
 			ctx,
@@ -116,18 +153,16 @@ func (h *handler) handleNotification(
 			event.ID,
 		)
 		if err != nil {
-			httpx.ServerErrorResponse(w, r, err)
-			return
+			return err
 		}
 		if !isNew {
 			continue
 		}
 
-		err = h.inboundPublisher.Publish(ctx, event)
-		if err != nil {
+		if err := h.inboundPublisher.Publish(ctx, event); err != nil {
 			releaseCtx, releaseCancel := context.WithTimeout(
-				context.WithoutCancel(r.Context()),
-				5*time.Second,
+				context.WithoutCancel(releaseBaseCtx),
+				webhookWorkTimeout,
 			)
 			releaseErr := h.messageRegistry.ReleaseInboundMessage(
 				releaseCtx,
@@ -136,15 +171,16 @@ func (h *handler) handleNotification(
 			)
 			releaseCancel()
 
-			httpx.ServerErrorResponse(w, r, errors.Join(err, releaseErr))
-			return
+			return errors.Join(err, releaseErr)
 		}
 	}
 
-	w.WriteHeader(http.StatusOK)
+	return nil
 }
 
-func validatePayload(p payload) error {
+func validatePayload(
+	p payload,
+) error {
 	if p.Object != "whatsapp_business_account" {
 		return fmt.Errorf("unexpected webhook object %q", p.Object)
 	}

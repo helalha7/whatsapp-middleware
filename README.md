@@ -85,14 +85,31 @@ Do not commit `.env` or real access tokens.
 Create the database, then run all migrations using the same DSN configured for the application:
 
 ```bash
-goose -dir migrations mysql "user:password@tcp(localhost:3306)/whatsapp_middleware?parseTime=true" up
+GOOSE_DRIVER=mysql \
+GOOSE_DBSTRING="user:password@tcp(localhost:3306)/whatsapp_middleware?parseTime=true" \
+GOOSE_MIGRATION_DIR=migrations \
+goose up
 ```
 
 Check migration status:
 
 ```bash
-goose -dir migrations mysql "user:password@tcp(localhost:3306)/whatsapp_middleware?parseTime=true" status
+GOOSE_DRIVER=mysql \
+GOOSE_DBSTRING="user:password@tcp(localhost:3306)/whatsapp_middleware?parseTime=true" \
+GOOSE_MIGRATION_DIR=migrations \
+goose status
 ```
+
+Migration filenames use Goose timestamp versions so developers can create
+migrations concurrently without colliding on the next sequence number. Create
+new migrations without the sequential `-s` option:
+
+```bash
+goose -dir migrations create add_example_table sql
+```
+
+Never rename or modify a migration after it has been applied to a shared
+environment.
 
 ## Run the Service
 

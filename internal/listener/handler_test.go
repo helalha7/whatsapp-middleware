@@ -79,15 +79,15 @@ func TestHandleNotificationProcessesBatch(t *testing.T) {
 	if len(registered) != 2 || len(publisher.messages) != 2 {
 		t.Fatalf("expected 2 registered and published messages, got registered=%d published=%d", len(registered), len(publisher.messages))
 	}
-	if publisher.messages[0].ID != "wamid.first" || publisher.messages[1].ID != "wamid.message-id" {
+	if publisher.messages[0].WhatsAppMessageID != "wamid.first" || publisher.messages[1].WhatsAppMessageID != "wamid.message-id" {
 		t.Errorf("unexpected published messages: %+v", publisher.messages)
 	}
 }
 
 func TestPublishEventsHandlesMixedBatch(t *testing.T) {
 	events := []event.InboundMessage{
-		{ID: "wamid.duplicate", WABAID: "waba-id"},
-		{ID: "wamid.new", WABAID: "waba-id"},
+		{WhatsAppMessageID: "wamid.duplicate", BusinessAccountID: "waba-id"},
+		{WhatsAppMessageID: "wamid.new", BusinessAccountID: "waba-id"},
 	}
 	registry := &stubMessageRegistry{
 		register: func(_ context.Context, _ string, messageID string) (bool, error) {
@@ -101,7 +101,7 @@ func TestPublishEventsHandlesMixedBatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(publisher.messages) != 1 || publisher.messages[0].ID != "wamid.new" {
+	if len(publisher.messages) != 1 || publisher.messages[0].WhatsAppMessageID != "wamid.new" {
 		t.Fatalf("expected only new message to be published, got %+v", publisher.messages)
 	}
 }
@@ -109,8 +109,8 @@ func TestPublishEventsHandlesMixedBatch(t *testing.T) {
 func TestPublishEventsReleasesFailedMessageInBatch(t *testing.T) {
 	queueError := errors.New("queue unavailable")
 	events := []event.InboundMessage{
-		{ID: "wamid.first", WABAID: "waba-id"},
-		{ID: "wamid.second", WABAID: "waba-id"},
+		{WhatsAppMessageID: "wamid.first", BusinessAccountID: "waba-id"},
+		{WhatsAppMessageID: "wamid.second", BusinessAccountID: "waba-id"},
 	}
 	releasedID := ""
 	registry := &stubMessageRegistry{
@@ -125,10 +125,10 @@ func TestPublishEventsReleasesFailedMessageInBatch(t *testing.T) {
 	published := make([]string, 0, 1)
 	publisher := &stubInboundPublisher{
 		publish: func(_ context.Context, message event.InboundMessage) error {
-			if message.ID == "wamid.second" {
+			if message.WhatsAppMessageID == "wamid.second" {
 				return queueError
 			}
-			published = append(published, message.ID)
+			published = append(published, message.WhatsAppMessageID)
 			return nil
 		},
 	}

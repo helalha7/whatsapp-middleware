@@ -149,8 +149,8 @@ func (h *handler) publishEvents(
 	for _, event := range events {
 		isNew, err := h.messageRegistry.RegisterInboundMessage(
 			ctx,
-			event.WABAID,
-			event.ID,
+			event.BusinessAccountID,
+			event.WhatsAppMessageID,
 		)
 		if err != nil {
 			return err
@@ -166,8 +166,8 @@ func (h *handler) publishEvents(
 			)
 			releaseErr := h.messageRegistry.ReleaseInboundMessage(
 				releaseCtx,
-				event.WABAID,
-				event.ID,
+				event.BusinessAccountID,
+				event.WhatsAppMessageID,
 			)
 			releaseCancel()
 

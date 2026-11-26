@@ -84,13 +84,13 @@ func normalizeMessage(
 	}
 
 	normalized := event.InboundMessage{
-		ID:                 msg.ID,
-		WABAID:             wabaID,
-		PhoneNumberID:      metadata.PhoneNumberID,
-		DisplayPhoneNumber: metadata.DisplayPhoneNumber,
-		From:               msg.From,
-		ContactName:        contactNames[msg.From],
-		Timestamp:          timestamp,
+		WhatsAppMessageID:          msg.ID,
+		BusinessAccountID:          wabaID,
+		BusinessPhoneNumberID:      metadata.PhoneNumberID,
+		BusinessDisplayPhoneNumber: metadata.DisplayPhoneNumber,
+		CustomerWhatsAppID:         msg.From,
+		CustomerName:               contactNames[msg.From],
+		SentAtUnix:                 timestamp,
 	}
 
 	switch msg.Type {
@@ -113,8 +113,8 @@ func normalizeText(normalized *event.InboundMessage, msg message) error {
 		return fmt.Errorf("missing text content for message %s", msg.ID)
 	}
 
-	normalized.Type = event.MessageTypeText
-	normalized.Text = &event.TextContent{Body: msg.Text.Body}
+	normalized.MessageType = event.MessageTypeText
+	normalized.TextContent = &event.TextContent{Body: msg.Text.Body}
 	return nil
 }
 
@@ -129,7 +129,7 @@ func normalizeInteractive(
 		)
 	}
 
-	normalized.Type = event.MessageTypeInteractive
+	normalized.MessageType = event.MessageTypeInteractive
 	switch msg.Interactive.Type {
 	case "button_reply":
 		if msg.Interactive.ButtonReply == nil {
@@ -138,7 +138,7 @@ func normalizeInteractive(
 				msg.ID,
 			)
 		}
-		normalized.Interactive = &event.InteractiveReply{
+		normalized.InteractiveReply = &event.InteractiveReply{
 			Type:  event.InteractiveButtonReply,
 			ID:    msg.Interactive.ButtonReply.ID,
 			Title: msg.Interactive.ButtonReply.Title,
@@ -150,7 +150,7 @@ func normalizeInteractive(
 				msg.ID,
 			)
 		}
-		normalized.Interactive = &event.InteractiveReply{
+		normalized.InteractiveReply = &event.InteractiveReply{
 			Type:  event.InteractiveListReply,
 			ID:    msg.Interactive.ListReply.ID,
 			Title: msg.Interactive.ListReply.Title,

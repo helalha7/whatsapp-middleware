@@ -95,8 +95,8 @@ func processInboundMessage(processor *messaging.Processor) func(event.InboundMes
 		if err := processor.Process(ctx, message); err != nil {
 			log.Printf(
 				"process inbound message id=%s waba_id=%s: %v",
-				message.ID,
-				message.WABAID,
+				message.WhatsAppMessageID,
+				message.BusinessAccountID,
 				err,
 			)
 			return
@@ -104,9 +104,9 @@ func processInboundMessage(processor *messaging.Processor) func(event.InboundMes
 
 		log.Printf(
 			"processed inbound message id=%s waba_id=%s type=%s",
-			message.ID,
-			message.WABAID,
-			message.Type,
+			message.WhatsAppMessageID,
+			message.BusinessAccountID,
+			message.MessageType,
 		)
 	}
 }

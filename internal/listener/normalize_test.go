@@ -33,20 +33,20 @@ func TestNormalizePayloadTextMessages(t *testing.T) {
 	}
 
 	first := events[0]
-	if first.ID != "wamid.message-id" || first.WABAID != "waba-id" {
+	if first.WhatsAppMessageID != "wamid.message-id" || first.BusinessAccountID != "waba-id" {
 		t.Errorf("unexpected message identity: %+v", first)
 	}
-	if first.PhoneNumberID != "phone-number-id" || first.From != "15551234567" {
+	if first.BusinessPhoneNumberID != "phone-number-id" || first.CustomerWhatsAppID != "15551234567" {
 		t.Errorf("unexpected routing fields: %+v", first)
 	}
-	if first.ContactName != "Customer" || first.Timestamp != 1794312000 {
+	if first.CustomerName != "Customer" || first.SentAtUnix != 1794312000 {
 		t.Errorf("unexpected contact or timestamp: %+v", first)
 	}
-	if first.Type != event.MessageTypeText || first.Text == nil || first.Text.Body != "Hello" {
+	if first.MessageType != event.MessageTypeText || first.TextContent == nil || first.TextContent.Body != "Hello" {
 		t.Errorf("unexpected text content: %+v", first)
 	}
-	if events[1].ContactName != "Second Customer" {
-		t.Errorf("expected second contact name, got %q", events[1].ContactName)
+	if events[1].CustomerName != "Second Customer" {
+		t.Errorf("expected second contact name, got %q", events[1].CustomerName)
 	}
 }
 
@@ -98,10 +98,10 @@ func TestNormalizePayloadInteractiveMessages(t *testing.T) {
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
-			if len(events) != 1 || events[0].Interactive == nil {
+			if len(events) != 1 || events[0].InteractiveReply == nil {
 				t.Fatalf("expected one interactive event, got %+v", events)
 			}
-			reply := events[0].Interactive
+			reply := events[0].InteractiveReply
 			if reply.Type != tt.wantType || reply.ID != tt.wantID || reply.Title != tt.wantTitle {
 				t.Errorf("unexpected interactive reply: %+v", reply)
 			}
@@ -122,7 +122,7 @@ func TestNormalizePayloadIgnoresUnsupportedMessages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(events) != 1 || events[0].ID != "wamid.message-id" {
+	if len(events) != 1 || events[0].WhatsAppMessageID != "wamid.message-id" {
 		t.Fatalf("expected only the supported text message, got %+v", events)
 	}
 }

@@ -141,13 +141,13 @@ func TestProcessEchoesTextMessage(t *testing.T) {
 	processor := NewProcessor(tenants, conversations, chatSessions, messages, sender, 10*time.Minute)
 
 	err := processor.Process(context.Background(), event.InboundMessage{
-		ID:            "wamid.message-id",
-		WABAID:        "waba-id",
-		PhoneNumberID: "phone-number-id",
-		From:          "15551234567",
-		ContactName:   "Ada Lovelace",
-		Type:          event.MessageTypeText,
-		Text:          &event.TextContent{Body: "Hello"},
+		WhatsAppMessageID:     "wamid.message-id",
+		BusinessAccountID:     "waba-id",
+		BusinessPhoneNumberID: "phone-number-id",
+		CustomerWhatsAppID:    "15551234567",
+		CustomerName:          "Ada Lovelace",
+		MessageType:           event.MessageTypeText,
+		TextContent:           &event.TextContent{Body: "Hello"},
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -206,7 +206,7 @@ func TestProcessIgnoresUnsupportedMessageType(t *testing.T) {
 	)
 
 	err := processor.Process(context.Background(), event.InboundMessage{
-		Type: event.MessageTypeInteractive,
+		MessageType: event.MessageTypeInteractive,
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -235,7 +235,7 @@ func TestProcessReturnsErrors(t *testing.T) {
 	}{
 		{
 			name:      "missing text content",
-			message:   event.InboundMessage{Type: event.MessageTypeText},
+			message:   event.InboundMessage{MessageType: event.MessageTypeText},
 			wantError: errors.New("inbound text message has no text content"),
 		},
 		{
@@ -308,11 +308,11 @@ func TestProcessReturnsErrors(t *testing.T) {
 
 func textMessage() event.InboundMessage {
 	return event.InboundMessage{
-		ID:            "wamid.message-id",
-		WABAID:        "waba-id",
-		PhoneNumberID: "phone-number-id",
-		From:          "15551234567",
-		Type:          event.MessageTypeText,
-		Text:          &event.TextContent{Body: "Hello"},
+		WhatsAppMessageID:     "wamid.message-id",
+		BusinessAccountID:     "waba-id",
+		BusinessPhoneNumberID: "phone-number-id",
+		CustomerWhatsAppID:    "15551234567",
+		MessageType:           event.MessageTypeText,
+		TextContent:           &event.TextContent{Body: "Hello"},
 	}
 }

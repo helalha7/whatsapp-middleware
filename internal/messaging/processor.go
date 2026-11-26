@@ -83,14 +83,14 @@ func (p *Processor) Process(
 	ctx context.Context,
 	message event.InboundMessage,
 ) error {
-	if message.Type != event.MessageTypeText {
+	if message.MessageType != event.MessageTypeText {
 		return nil
 	}
-	if message.Text == nil {
+	if message.TextContent == nil {
 		return errors.New("inbound text message has no text content")
 	}
 
-	tenantID, accessToken, err := p.tenants.GetMessagingCredentials(ctx, message.WABAID)
+	tenantID, accessToken, err := p.tenants.GetMessagingCredentials(ctx, message.BusinessAccountID)
 	if err != nil {
 		return err
 	}
@@ -98,8 +98,8 @@ func (p *Processor) Process(
 	conversation, err := p.conversations.Upsert(
 		ctx,
 		tenantID,
-		message.From,
-		message.ContactName,
+		message.CustomerWhatsAppID,
+		message.CustomerName,
 	)
 	if err != nil {
 		return err
@@ -116,9 +116,9 @@ func (p *Processor) Process(
 	inboundMessage := &messagedomain.Message{
 		ConversationID:    conversation.ID,
 		ChatSessionID:     chatSession.ID,
-		WhatsAppMessageID: message.ID,
+		WhatsAppMessageID: message.WhatsAppMessageID,
 		Direction:         messagedomain.DirectionInbound,
-		Content:           message.Text.Body,
+		Content:           message.TextContent.Body,
 	}
 	if err := p.messages.Insert(ctx, inboundMessage); err != nil {
 		return err
@@ -136,9 +136,9 @@ func (p *Processor) Process(
 
 	if err := p.sender.SendTextMessage(
 		ctx,
-		message.PhoneNumberID,
+		message.BusinessPhoneNumberID,
 		accessToken,
-		message.From,
+		message.CustomerWhatsAppID,
 		echo,
 	); err != nil {
 		return err

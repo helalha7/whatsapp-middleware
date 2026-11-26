@@ -15,18 +15,18 @@ const (
 )
 
 type InboundMessage struct {
-	ID                 string
-	WABAID             string
-	PhoneNumberID      string
-	DisplayPhoneNumber string
+	WhatsAppMessageID          string
+	BusinessAccountID          string
+	BusinessPhoneNumberID      string
+	BusinessDisplayPhoneNumber string
 
-	From        string
-	ContactName string
-	Timestamp   int64
+	CustomerWhatsAppID string
+	CustomerName       string
+	SentAtUnix         int64
 
-	Type        MessageType
-	Text        *TextContent
-	Interactive *InteractiveReply
+	MessageType      MessageType
+	TextContent      *TextContent
+	InteractiveReply *InteractiveReply
 }
 
 type TextContent struct {

@@ -4,6 +4,8 @@
 
 This service receives WhatsApp Cloud API webhooks and routes normalized inbound messages through an in-memory queue and worker pool. The current messaging workflow echoes text; AI response generation will be introduced behind the messaging layer later.
 
+The next planned workflow adds tenant business profiles, weekly business and service hours, service catalogs, and native WhatsApp location replies. The schema and behavior documented in `README.md` are the source of truth for that work; do not describe planned functionality as already implemented.
+
 Read `README.md` for setup and system behavior. Read `TECHNICAL_ROADMAP.md` before making architectural or reliability changes.
 
 ## Architecture Boundaries
@@ -17,6 +19,7 @@ Read `README.md` for setup and system behavior. Read `TECHNICAL_ROADMAP.md` befo
 - `internal/messaging`: coordinate message workflows, including future AI calls.
 - `internal/sender`: own outbound WhatsApp HTTP requests and Meta response handling.
 - `internal/tenant`: own tenant domain data and persistence.
+- Business profile, hours, and service-catalog persistence belong in dedicated domain packages; do not put their query logic in `listener`, `sender`, or generic queue/worker packages.
 - `internal/httpx`: reusable HTTP response and decoding helpers.
 
 Keep dependencies pointing toward small interfaces defined by the package that consumes them. Wire concrete implementations in `cmd/application.go`.
@@ -40,10 +43,26 @@ goose -dir migrations validate
 ## Database Rules
 
 - Add a new numbered Goose migration; never modify a migration that may already be applied.
+- Use timestamp-versioned migration filenames created without Goose's sequential `-s` option.
 - Keep expected persistence errors in `internal/data/errors.go`.
 - Translate known driver errors in stores and return unexpected errors unchanged.
 - Preserve context-aware database calls.
 - Never expose tenant access tokens through JSON or logs.
+
+### Business and service schema
+
+- Implement the README schema with `business_information`, `business_hours`, `services`, and `service_hours`; keep foreign-key column types and signedness identical to the referenced keys.
+- `business_information.tenant_id` is both its primary key and a foreign key to `tenants.id`, enforcing one business profile per tenant.
+- Create the business profile in the same transaction as tenant registration, initialize its name from the tenant name, and backfill profiles for existing tenants when introducing the schema.
+- `business_hours` belongs to a business profile. `services` belongs to a tenant. `service_hours` belongs to a service.
+- Scope every service and service-hours read or mutation by `tenant_id`, including lookups that begin with a service ID. Do not allow cross-tenant access.
+- Use `0` for Sunday through `6` for Saturday, matching Go's `time.Weekday`. Reject invalid days and intervals where `opens_at >= closes_at`.
+- Interpret hours in the IANA timezone stored on `business_information`; do not treat stored `TIME` values as UTC.
+- Allow multiple opening intervals per day. No business-hours rows means the business is closed that day.
+- A service with no `service_hours` rows inherits business hours. Once any service-specific hours exist, they define the service's complete weekly schedule; its effective availability is their overlap with business hours.
+- Store service prices directly in ILS using `DECIMAL(10,2)`, require nonnegative prices and positive durations, and retire services with `is_active = false` rather than deleting records needed by future bookings.
+- Store latitude and longitude as an all-or-nothing pair. Validate finite values and ranges of `[-90, 90]` and `[-180, 180]`; clearing the map pin sets both columns to `NULL`.
+- Keep the street address independent from coordinates so it remains available as a text fallback.
 
 ## Webhook Rules
 
@@ -66,6 +85,10 @@ goose -dir migrations validate
 - `messaging.Processor` owns workflow coordination.
 - A future `ai` package should interpret content and generate responses only.
 - AI code must not call WhatsApp directly; delivery remains in `sender`.
+- Business-information and service tools return tenant-scoped domain data to the messaging workflow; they must not send WhatsApp messages themselves.
+- General business questions use the business profile and weekly hours. Service inquiries use active services and their effective hours.
+- Location requests use a native WhatsApp location reply only when both coordinates are present. Otherwise send the street address as text, or state that the location is unavailable when neither is configured.
+- `internal/sender` owns serialization and delivery of both text and native WhatsApp location payloads. Persist outbound replies in the active chat session with the correct message type.
 - Do not log prompts, message content or credentials without an explicit privacy decision.
 - Preserve or deliberately design per-conversation ordering before adding persistent AI conversation state.
 
